@@ -117,16 +117,24 @@
 
     // AR内でモデル選択
     menu.clear();
-    const spacing = 0.2;
-    const total = records.length;
-
+    const spacingX = 0.2;
+    const spacingY = 0.25;
+    const itemsPerRow = 5;
+    
     records.forEach((item, i) => {
       const btn = createLabelButton(item.name);
       btn.userData.path = item.path;
       btn.userData.name = item.name;
-      btn.position.x = (i - (total - 1) / 2) * spacing;
-      btn.position.y = -0.3;
+    
+      const row = Math.floor(i / itemsPerRow);
+      const col = i % itemsPerRow;
+    
+      // 中央揃えのx位置計算
+      const offsetX = (itemsPerRow - 1) / 2;
+      btn.position.x = (col - offsetX) * spacingX;
+      btn.position.y = -0.3 - row * spacingY;
       btn.position.z = -0.2;
+    
       menu.add(btn);
     });
 
