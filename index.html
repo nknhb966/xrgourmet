@@ -118,8 +118,11 @@
     // AR内でモデル選択
     menu.clear();
     const spacingX = 0.2;
-    const spacingY = 0.25;
+    const spacingY = 0.1;
     const itemsPerRow = 5;
+    
+    const total = records.length;
+    const totalRows = Math.ceil(total / itemsPerRow);
     
     records.forEach((item, i) => {
       const btn = createLabelButton(item.name);
@@ -127,11 +130,15 @@
       btn.userData.name = item.name;
     
       const row = Math.floor(i / itemsPerRow);
-      const col = i % itemsPerRow;
+      const indexInRow = i % itemsPerRow;
+      
+      const itemsInThisRow = (row === totalRows - 1 && total % itemsPerRow !== 0)
+        ? total % itemsPerRow
+        : itemsPerRow;
     
-      // 中央揃えのx位置計算
-      const offsetX = (itemsPerRow - 1) / 2;
-      btn.position.x = (col - offsetX) * spacingX;
+      const offsetX = (itemsInThisRow - 1) / 2;
+      btn.position.x = (indexInRow - offsetX) * spacingX;
+    
       btn.position.y = -0.3 - row * spacingY;
       btn.position.z = -0.2;
     
