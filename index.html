@@ -30,6 +30,25 @@
   import { initXR, waitLoadGLTF, createModelText, isVisionPro } from "https://code4fukui.github.io/vr-lenspark/threeutil.js";
   const csvURL = "./models.csv";
 
+  // CSVパース関数
+  function parseCSV(csvData) {
+    const lines = csvData.split('\n');
+    const result = [];
+    const headers = lines[0].split(',');
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === '') {
+        continue;
+      }
+      const obj = {};
+      const currentline = lines[i].split(',');
+      for (let j = 0; j < headers.length; j++) {
+        obj[headers[j].trim()] = currentline[j].trim();
+      }
+      result.push(obj);
+    }
+    return result;
+  }
+
   // ラベルボタン作成関数
   const createLabelButton = (text, width = 512, height = 128) => {
     const canvas = document.createElement("canvas");
