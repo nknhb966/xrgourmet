@@ -183,6 +183,16 @@
     }
   }
 
+  function disposeModel(model) {
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.geometry?.dispose();
+        disposeMaterial(child.material);
+      }
+    });
+    scene.remove(model);
+  }
+
   let isLoadingModel = false;
 
   // モデルをロードして表示
@@ -191,13 +201,7 @@
     isLoadingModel = true;
 
     if (currentModel) {
-      currentModel.traverse((child) => {
-        if (child.isMesh) {
-          child.geometry?.dispose();
-          disposeMaterial(child.material);
-        }
-      });
-      scene.remove(currentModel);
+      disposeModel(currentModel);
       txts.forEach(t => scene.remove(t));
       txts = [];
       currentModel = null;
@@ -419,12 +423,23 @@
       currentModel.rotation.z += (targetRotation.z - currentModel.rotation.z) * easing;
 
       const scalePercent = Math.round(currentModel.scale.x * 100);
-      if (txts[0]) {
+      // if (txts[0]) {
+      //   scene.remove(txts[0]);
+      //   const newTxt = createModelText(`${scalePercent}%`, 0.1);
+      //   newTxt.position.set(currentModel.position.x, currentModel.position.y + 0.2, currentModel.position.z);
+      //   scene.add(newTxt);
+      //   txts[0] = newTxt;
+      //   lastScalePercent = scalePercent;
+      // }
+      if (txts[0] && scalePercent !== lastScalePercent) {
+        txts[0].geometry.dispose();
         scene.remove(txts[0]);
+
         const newTxt = createModelText(`${scalePercent}%`, 0.1);
-        newTxt.position.set(currentModel.position.x, currentModel.position.y + 0.2, currentModel.position.z);
+        newTxt.position.copy(currentModel.position).add(new THREE.Vector3(0, 0.2, 0));
         scene.add(newTxt);
         txts[0] = newTxt;
+
         lastScalePercent = scalePercent;
       }
 
