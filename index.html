@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <title>craftARt Lite XR-Gourmet</title>
+  <title>craftARt Lite</title>
   <meta name="viewport" content="width=device-width">
   <link rel="icon" href="data:">
 </head>
@@ -26,11 +26,46 @@
   </script>
 
   <script type="module">
+  // ◎1. import + Three.js 初期化
   import { THREE, scene, camera, renderer, ctrls } from "https://code4fukui.github.io/egxr.js/egxr.js";
-  import { initXR, waitLoadGLTF, createModelText, isVisionPro } from "https://code4fukui.github.io/vr-lenspark/threeutil.js";
-  const csvURL = "./models.csv";
+  import { initXR, waitLoadGLTF, createModelImage, createModelText, isVisionPro } from "https://code4fukui.github.io/vr-lenspark/threeutil.js";
 
-  // CSVパース関数
+  // ◎2. 定数 / グローバル状態
+  // 定数
+  const csvURL = "./models.csv";
+  const easing = 0.1;
+  const offy = isVisionPro() ? 0.6 : 0;
+  const SPECIAL_KEYWORD_OFFSETS_Y = {
+    "遺構": -1.5,
+  };
+
+  // グローバル状態
+  let currentModel = null;
+  let showInfo = true;
+  let mesh = null;
+  let txts = [];
+  let isScaling = false;
+  let isRotating = false;
+  let initialDistance = null;
+  let initialScale = 1;
+  let lastCenterPos = null;
+  let lastCtrlPos = null;
+  let lastDirection = null;
+  let isLoadingModel = false;
+  let lastScalePercent = 100;
+  let isAnimationEnabled = true;
+
+  // Three.js シーン構築用
+  const menu = new THREE.Group();
+  scene.add(menu);
+
+  let targetPosition = new THREE.Vector3();
+  let targetScale = new THREE.Vector3(1, 1, 1);
+  let targetQuaternion = new THREE.Quaternion();
+
+
+  // ◎3. ユーティリティ関数
+  // CSVデータをオブジェクト配列に変換する関数
   function parseCSV(csvData) {
     const lines = csvData.split('\n');
     const result = [];
@@ -49,129 +84,7 @@
     return result;
   }
 
-  // ラベルボタン作成関数
-  const createLabelButton = (text, width = 512, height = 128) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#4444ff";
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "48px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, width / 2, height / 2);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
-    const geometry = new THREE.PlaneGeometry(0.16, 0.04);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.userData.label = text;
-    return mesh;
-  };
-
-  const menu = new THREE.Group();
-  scene.add(menu);
-
-  // モデル操作関連
-  let currentModel = null;
-
-  const onMenuClick = (ctrl) => {
-    for (const child of menu.children) {
-      const worldPos = child.getWorldPosition(new THREE.Vector3());
-      if (ctrl.position.distanceTo(worldPos) < 0.05) {
-        if (currentModel?.userData?.path === child.userData.path) return;
-        loadModel(child.userData.path, child.userData.name);
-      }
-    }
-  };
-
-  // ロード時の制御
-  const loadMenuFromCSV = async () => {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-    scene.add(ambientLight);
-
-    const res = await fetch(csvURL);
-    const text = await res.text();
-    const records = parseCSV(text);
-
-    // ブラウザモードでモデル選択
-    const modelSelect = document.getElementById("modelSelect");
-    modelSelect.innerHTML = "";
-
-    records.forEach((item, index) => {
-      const option = document.createElement("option");
-      option.value = index;
-      option.textContent = item.name;
-      modelSelect.appendChild(option);
-    });
-
-    modelSelect.addEventListener("change", async (e) => {
-      const selectedIndex = e.target.value;
-      const item = records[selectedIndex];
-      if (item) {
-        await loadModel(item.path, item.name);
-      }
-    });
-
-    // AR内でモデル選択
-    menu.clear();
-    const spacingX = 0.2;
-    const spacingY = 0.1;
-    const itemsPerRow = 5;
-    
-    const total = records.length;
-    const totalRows = Math.ceil(total / itemsPerRow);
-    
-    records.forEach((item, i) => {
-      const btn = createLabelButton(item.name);
-      btn.userData.path = item.path;
-      btn.userData.name = item.name;
-    
-      const row = Math.floor(i / itemsPerRow);
-      const indexInRow = i % itemsPerRow;
-      
-      const itemsInThisRow = (row === totalRows - 1 && total % itemsPerRow !== 0)
-        ? total % itemsPerRow
-        : itemsPerRow;
-    
-      const offsetX = (itemsInThisRow - 1) / 2;
-      btn.position.x = (indexInRow - offsetX) * spacingX;
-    
-      btn.position.y = -0.3 - row * spacingY;
-      btn.position.z = -0.2;
-    
-      menu.add(btn);
-    });
-
-    if (records[0]) {
-      await loadModel(records[0].path, records[0].name);
-    }
-  };
-
-  loadMenuFromCSV();
-
-  // 状態用
-  let mesh = null;
-  let txts = [];
-  let isScaling = false;
-  let isRotating = false;
-  let initialDistance = null;
-  let initialScale = 1;
-  let lastCenterPos = null;
-  let lastCtrlPos = null;
-  let lastDirection = null;
-
-  // イージング
-  const easing = 0.1;
-  let targetPosition = new THREE.Vector3();
-  let targetScale = new THREE.Vector3(1, 1, 1);
-  let targetQuaternion = new THREE.Quaternion();
-
-  const offy = isVisionPro() ? 0.6 : 0;
-
-  // マテリアルの破棄
+  // マテリアルとそのテクスチャを破棄する関数
   function disposeMaterial(material) {
     if (Array.isArray(material)) {
       material.forEach(m => {
@@ -184,6 +97,7 @@
     }
   }
 
+  // モデル全体を破棄する関数（メッシュ・ジオメトリ・マテリアル）
   function disposeModel(model) {
     model.traverse(child => {
       if (child.isMesh) {
@@ -194,9 +108,124 @@
     scene.remove(model);
   }
 
-  let isLoadingModel = false;
 
-  // モデルをロードして表示
+  // ◎4. UI作成関数
+  // ボタン風のテキスト画像を生成し、Three.jsの平面オブジェクトを返す関数
+  const createLabelButton = (text, bgColor = "#44ccff", textColor = "#000000", width = 512, height = 128) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = textColor;
+    ctx.font = "bold 40px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, width / 2, height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+    const geometry = new THREE.PlaneGeometry(0.16, 0.04);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData.label = text;
+    return mesh;
+  };
+
+  // モデル説明テキストの画像を生成する関数（全角・複数行対応）
+  const createModelDescription = (text, w = 1.0, color = "white", size = 64, maxCharsPerLine = 15, parent) => {
+    const toZenkaku = (str) => {
+      return str.replace(/[A-Za-z0-9!-/:-@¥[-`{-~]/g, (s) =>
+        String.fromCharCode(s.charCodeAt(0) + 0xFEE0)
+      ).replace(/ /g, "　");
+    };
+
+    const zenkakuText = toZenkaku(text);
+
+    const lines = [];
+    for (let i = 0; i < zenkakuText.length; i += maxCharsPerLine) {
+      lines.push(zenkakuText.substring(i, i + maxCharsPerLine));
+    }
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const approxCharWidth = size;
+    const canvasWidth = approxCharWidth * maxCharsPerLine;
+    const lineHeight = size * 1.2;
+    const canvasHeight = lineHeight * lines.length;
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    ctx.font = `${size}px sans-serif`;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = size * 0.02;
+
+    for (let i = 0; i < lines.length; i++) {
+      const y = (i + 1) * lineHeight - (size * 0.2);
+      ctx.fillText(lines[i], 0, y);
+      ctx.strokeText(lines[i], 0, y);
+    }
+
+    const h = w / canvas.width * canvas.height;
+    return createModelImage(canvas, w, h, false, parent);
+  };
+
+
+  // ◎5. 情報表示、アニメーション制御関連
+  // 情報表示のON/OFFを反映する関数
+  function updateInfoVisibility() {
+    txts.forEach(obj => {
+      obj.visible = showInfo;
+    });
+  }
+
+  // 情報表示切替ボタンの見た目を更新する関数
+  function updateToggleButtonAppearance(toggleBtn) {
+    const bgColor = showInfo ? "#333333" : "#cccccc";
+    const textColor = showInfo ? "#ffffff" : "#000000";
+
+    const newBtn = createLabelButton("情報表示切替", bgColor, textColor);
+    newBtn.position.copy(toggleBtn.position);
+    newBtn.userData = { ...toggleBtn.userData };
+
+    const index = menu.children.indexOf(toggleBtn);
+    if (index !== -1) {
+      if (toggleBtn.material) {
+        if (toggleBtn.material.map) toggleBtn.material.map.dispose();
+        toggleBtn.material.dispose();
+      }
+      if (toggleBtn.geometry) toggleBtn.geometry.dispose();
+      menu.remove(toggleBtn);
+    }
+    menu.add(newBtn);
+  }
+
+  // アニメーション切替ボタンの見た目を更新する関数
+  function updateAnimationToggleButtonAppearance(toggleBtn) {
+    const bgColor = isAnimationEnabled ? "#ff6666" : "#ffe5e5";
+    const textColor = isAnimationEnabled ? "#ffffff" : "#cc0000";
+
+    const newBtn = createLabelButton("アニメーション", bgColor, textColor);
+    newBtn.position.copy(toggleBtn.position);
+    newBtn.userData = { ...toggleBtn.userData };
+
+    const index = menu.children.indexOf(toggleBtn);
+    if (index !== -1) {
+      if (toggleBtn.material) {
+        if (toggleBtn.material.map) toggleBtn.material.map.dispose();
+        toggleBtn.material.dispose();
+      }
+      if (toggleBtn.geometry) toggleBtn.geometry.dispose();
+      menu.remove(toggleBtn);
+    }
+    menu.add(newBtn);
+  }
+
+  // ◎6. モデルロード・初期化
+  // 指定パスのGLTFモデルを読み込み、シーンに配置・操作を設定する関数
   async function loadModel(path, name) {
     if (isLoadingModel) return;
     isLoadingModel = true;
@@ -210,24 +239,71 @@
 
     const model = await waitLoadGLTF(path);
     model.userData.path = path;
-    model.position.set(0, offy - 0.2, -0.5);
+
+    let yOffset = offy - 0.2;
+    for (const keyword in SPECIAL_KEYWORD_OFFSETS_Y) {
+      if (name.includes(keyword)) {
+        yOffset += SPECIAL_KEYWORD_OFFSETS_Y[keyword];
+        break;
+      }
+    }
+
+    model.position.set(0, yOffset, -0.5);
     model.scale.set(1, 1, 1);
     scene.add(model);
     currentModel = model;
 
-    let txt1 = createModelText("100%", 0.1);
-    let txt2 = createModelText(name, 0.2);
-    txt1.position.set(model.position.x, model.position.y + 0.2, model.position.z);
-    txt2.position.set(model.position.x + 0.2, model.position.y + 0.1, model.position.z);
+    // ラベル表示：スケール、モデル名
+    const txt1 = createModelText("100%", 0.1);
+    const txt2 = createModelText(name, 0.2);
+    txt1.position.set(model.position.x, offy, model.position.z);
+    txt2.position.set(model.position.x + 0.2, offy - 0.1, model.position.z);
     scene.add(txt1);
     scene.add(txt2);
     txts = [txt1, txt2];
+
+    // CSV上の item を menu.children から探す
+    const selectedItem = Array.from(menu.children).find(c => c.userData.path === path)?.userData;
+
+    // 説明表示
+    if (selectedItem?.description) {
+      const txtDesc = createModelDescription(selectedItem.description, 0.5);
+      txtDesc.position.set(model.position.x - 0.4, offy - 0.1, model.position.z);
+      scene.add(txtDesc);
+      txts.push(txtDesc);
+    }
+
+    // ボタンの色を更新（選択中＝青、非選択＝水色）
+    const oldButtons = menu.children.slice();
+
+    oldButtons.forEach((oldBtn) => {
+      if (!oldBtn.userData.path) return;
+      const isSelected = oldBtn.userData.path === path;
+      const color = isSelected ? "#0000ff" : "#44ccff";
+      const newBtn = createLabelButton(oldBtn.userData.name, color);
+      newBtn.position.copy(oldBtn.position);
+      newBtn.userData = { ...oldBtn.userData };
+
+      if (oldBtn.material) {
+        if (oldBtn.material.map) oldBtn.material.map.dispose();
+        oldBtn.material.dispose();
+      }
+      if (oldBtn.geometry) {
+        oldBtn.geometry.dispose();
+      }
+
+      menu.remove(oldBtn);
+      menu.add(newBtn);
+    });
 
     targetPosition.copy(model.position);
     targetScale.set(1, 1, 1);
     targetQuaternion.copy(model.quaternion);
 
+    // アニメーション設定
     model.animate = () => {
+      if (!isAnimationEnabled) return;
+
       const selectedCtrls = ctrls.filter(c => c.selected);
 
       if (selectedCtrls.length === 2) {
@@ -292,24 +368,139 @@
       lastCtrlPos = null;
       lastDirection = null;
     };
-
     isLoadingModel = false;
+    updateInfoVisibility();
   }
 
-  // === スマホ・PC用 ===
+
+  // ◎7. メニュー生成・選択
+  // CSVを読み込んでメニューを構築・モデルを選択可能にする関数
+  const loadMenuFromCSV = async () => {
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambientLight);
+
+    const res = await fetch(csvURL);
+    const text = await res.text();
+    const records = parseCSV(text);
+
+    // ブラウザモードでモデル選択
+    const modelSelect = document.getElementById("modelSelect");
+    modelSelect.innerHTML = "";
+
+    records.forEach((item, index) => {
+      const option = document.createElement("option");
+      option.value = index;
+      option.textContent = item.name;
+
+      modelSelect.appendChild(option);
+    });
+
+    modelSelect.addEventListener("change", async (e) => {
+      const selectedIndex = e.target.value;
+      const item = records[selectedIndex];
+      if (item) {
+        await loadModel(item.path, item.name);
+      }
+    });
+
+    // ARモードでモデル選択
+    menu.clear();
+    const spacingX = 0.2;
+    const spacingY = 0.1;
+    const itemsPerRow = 5;
+    
+    const total = records.length;
+    const totalRows = Math.ceil(total / itemsPerRow);
+    
+    records.forEach((item, i) => {
+      const oldBtn = menu.children[i];
+      if (oldBtn && oldBtn.material) {
+        if (oldBtn.material.map) oldBtn.material.map.dispose();
+        oldBtn.material.dispose();
+        if (oldBtn.geometry) oldBtn.geometry.dispose();
+        menu.remove(oldBtn);
+      }
+
+      const btn = createLabelButton(item.name);
+      btn.userData.path = item.path;
+      btn.userData.name = item.name;
+      btn.userData.description = item.description;
+      btn.userData.url = item.url;
+
+      const row = Math.floor(i / itemsPerRow);
+      const indexInRow = i % itemsPerRow;
+      
+      const itemsInThisRow = (row === totalRows - 1 && total % itemsPerRow !== 0)
+        ? total % itemsPerRow
+        : itemsPerRow;
+    
+      const offsetX = (itemsInThisRow - 1) / 2;
+      btn.position.x = (indexInRow - offsetX) * spacingX;    
+      btn.position.y = -0.3 - row * spacingY;
+      btn.position.z = -0.2;
+    
+      menu.add(btn);
+    });
+
+    if (records[0]) {
+      await loadModel(records[0].path, records[0].name);
+    }
+
+    const toggleBtn = createLabelButton("情報表示切替", "#333333", "#ffffff");
+    if (toggleBtn.material) {
+      if (toggleBtn.material.map) toggleBtn.material.map.dispose();
+      toggleBtn.material.dispose();
+    }
+    if (toggleBtn.geometry) toggleBtn.geometry.dispose();
+    menu.remove(toggleBtn);
+    toggleBtn.position.set(-0.4, -0.1, -0.2);
+    toggleBtn.userData.toggleInfo = true;
+    menu.add(toggleBtn);
+
+    const animToggleBtn = createLabelButton("アニメーション", "#ff6666", "#ffffff");
+    if (animToggleBtn.material) {
+      if (animToggleBtn.material.map) animToggleBtn.material.map.dispose();
+      animToggleBtn.material.dispose();
+    }
+    if (animToggleBtn.geometry) animToggleBtn.geometry.dispose();
+    menu.remove(animToggleBtn);
+    animToggleBtn.position.set(-0.4, -0.2, -0.2);
+    animToggleBtn.userData.toggleAnimation = true;
+    menu.add(animToggleBtn);
+  };
+
+  loadMenuFromCSV();
+
+
+  // ◎8. コントローラ処理
+  // コントローラの選択処理（モデルロードや情報、アニメーション切り替え）
+  const onMenuClick = (ctrl) => {
+    for (const child of menu.children) {
+      const worldPos = child.getWorldPosition(new THREE.Vector3());
+      if (ctrl.position.distanceTo(worldPos) < 0.08) {
+        if (child.userData.toggleInfo) {
+          showInfo = !showInfo;
+          updateInfoVisibility();
+          updateToggleButtonAppearance(child);
+          return;
+        }
+        if (child.userData.toggleAnimation) {
+          isAnimationEnabled = !isAnimationEnabled;
+          updateAnimationToggleButtonAppearance(child);
+          return;
+        }
+        if (currentModel?.userData?.path === child.userData.path) return;
+        loadModel(child.userData.path, child.userData.name);
+      }
+    }
+  };
+
+
+
+  // === マウス・タッチ操作対応処理 ===
+  // ◎1. 共通ユーティリティ
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
-
-  renderer.domElement.addEventListener("click", (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(menu.children);
-    if (intersects.length > 0) {
-      const clicked = intersects[0].object;
-      loadModel(clicked.userData.path, clicked.userData.name);
-    }
-  });
 
   let isUserRotating = false;
   let isUserScaling = false;
@@ -320,19 +511,32 @@
   let initialTouchDist = 0;
   let lastTouchCenter = null;
   let lastTouchAngle = null;
-  let initialAngle = 0;
 
-  renderer.domElement.addEventListener("mousedown", (e) => {
+
+  // ◎2. モデルメニューのクリック処理
+  function onClickMenu(event) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(menu.children);
+    if (intersects.length > 0) {
+      const clicked = intersects[0].object;
+      loadModel(clicked.userData.path, clicked.userData.name);
+    }
+  }
+
+
+  // ◎3. マウス操作（回転・移動・拡大）
+  function onMouseDown(e) {
     if (e.button === 0) {
       isLeftDragging = true;
-      lastMousePos = { x: e.clientX, y: e.clientY };
     } else if (e.button === 2) {
       isRightDragging = true;
-      lastMousePos = { x: e.clientX, y: e.clientY };
     }
-  });
+    lastMousePos = { x: e.clientX, y: e.clientY };
+  }
 
-  renderer.domElement.addEventListener("mousemove", (e) => {
+  function onMouseMove(e) {
     if (!currentModel || !lastMousePos) return;
 
     const dx = e.clientX - lastMousePos.x;
@@ -356,46 +560,51 @@
     }
 
     lastMousePos = { x: e.clientX, y: e.clientY };
-  });
+  }
 
-  renderer.domElement.addEventListener("mouseup", (e) => {
+  function onMouseUp(e) {
     if (e.button === 0) isLeftDragging = false;
     if (e.button === 2) isRightDragging = false;
     lastMousePos = null;
-  });
+  }
 
-  renderer.domElement.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-  });
-
-  renderer.domElement.addEventListener("wheel", (e) => {
+  function onMouseWheel(e) {
     if (!currentModel) return;
     const scaleDelta = e.deltaY < 0 ? 1.1 : 0.9;
     targetScale.multiplyScalar(scaleDelta);
-  });
+  }
 
-  renderer.domElement.addEventListener("touchstart", (e) => {
+  function onContextMenu(e) {
+    e.preventDefault();
+  }
+
+
+  // ◎4. タッチ操作（スマホ）
+  function onTouchStart(e) {
     if (e.touches.length === 2) {
       isUserScaling = true;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       initialTouchDist = Math.hypot(dx, dy);
       initialScale = currentModel?.scale?.x || 1;
+
       lastTouchCenter = {
         x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
         y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
       };
       lastTouchAngle = Math.atan2(dy, dx);
+
     } else if (e.touches.length === 1) {
       isUserRotating = true;
       prevMouse.x = e.touches[0].clientX;
       prevMouse.y = e.touches[0].clientY;
     }
-  });
+  }
 
-  renderer.domElement.addEventListener("touchmove", (e) => {
-    if (e.touches.length === 2 && isUserScaling && currentModel) {
-      event.preventDefault();
+  function onTouchMove(e) {
+    if (!currentModel) return;
+    if (e.touches.length === 2 && isUserScaling) {
+      e.preventDefault();
 
       // スケーリング
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -411,9 +620,8 @@
       };
       const deltaX = (newCenter.x - lastTouchCenter.x) / window.innerWidth;
       const deltaY = (newCenter.y - lastTouchCenter.y) / window.innerHeight;
-      const moveFactor = 1.0;
-      targetPosition.x += deltaX * moveFactor;
-      targetPosition.y -= deltaY * moveFactor;
+      targetPosition.x += deltaX * 1.0;
+      targetPosition.y -= deltaY * 1.0;
       lastTouchCenter = newCenter;
 
       // Z軸回転
@@ -423,8 +631,9 @@
       targetQuaternion.premultiply(qz);
       lastTouchAngle = newAngle;
 
-    } else if (e.touches.length === 1 && isUserRotating && currentModel) {
-      event.preventDefault();
+    } else if (e.touches.length === 1 && isUserRotating) {
+      e.preventDefault();
+
       const dx = e.touches[0].clientX - prevMouse.x;
       const dy = e.touches[0].clientY - prevMouse.y;
       const eulerX = new THREE.Euler(dy * 0.01, 0, 0, 'XYZ');
@@ -432,20 +641,42 @@
       const qx = new THREE.Quaternion().setFromEuler(eulerX);
       const qy = new THREE.Quaternion().setFromEuler(eulerY);
       targetQuaternion.premultiply(qy).premultiply(qx);
+
       prevMouse.x = e.touches[0].clientX;
       prevMouse.y = e.touches[0].clientY;
     }
-  });
+  }
 
-  renderer.domElement.addEventListener("touchend", () => {
+  function onTouchEnd() {
     isUserScaling = false;
     isUserRotating = false;
     lastTouchAngle = null;
-  });
+  }
 
-  let lastScalePercent = 100;
 
-  // メインループ
+  // ◎5. イベントリスナー登録
+  function setupInteractionEvents() {
+    const dom = renderer.domElement;
+
+    dom.addEventListener("click", onClickMenu);
+    dom.addEventListener("mousedown", onMouseDown);
+    dom.addEventListener("mousemove", onMouseMove);
+    dom.addEventListener("mouseup", onMouseUp);
+    dom.addEventListener("wheel", onMouseWheel);
+    dom.addEventListener("contextmenu", onContextMenu);
+
+    dom.addEventListener("touchstart", onTouchStart, { passive: false });
+    dom.addEventListener("touchmove", onTouchMove, { passive: false });
+    dom.addEventListener("touchend", onTouchEnd);
+  }
+
+
+  // ◎6. 初期化時に呼び出す
+  setupInteractionEvents();
+
+
+
+  // === （共通）メインループ ===
   renderer.setAnimationLoop(() => {
     if (currentModel) {
       currentModel.animate();
