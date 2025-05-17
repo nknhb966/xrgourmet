@@ -1,10 +1,10 @@
-path,name
-https://code4fukui.github.io/xrgourmet/lejardin-waton.glb,和豚料理
-https://code4fukui.github.io/xrgourmet/salice-ichigo-pafrait.glb,いちごティラミスパフェ
-https://code4fukui.github.io/xrgourmet/takoyaki-takobei.glb,たこ焼き
-https://code4fukui.github.io/xrgourmet/kosen-dago.glb,高専ダゴ
-https://code4fukui.github.io/xrgourmet/echizen-seikogani.glb,越前せいごがに
-https://code4fukui.github.io/xrgourmet/slim-volgarice.glb,ボルガライス
-https://code4fukui.github.io/xrgourmet/kanematsu-sasimiteisyoku.glb,さしみ定食
-https://code4fukui.github.io/xrgourmet/mutsunohana-steak.glb,ステーキ
-https://code4fukui.github.io/xrgourmet/icecream-makibabokujo.glb,ソフトクリーム
+path,name,description,url
+https://code4fukui.github.io/xrgourmet/lejardin-waton.glb,和豚料理,ル ジャルダン,https://lejardin-fukui.com/
+https://code4fukui.github.io/xrgourmet/salice-ichigo-pafrait.glb,いちごティラミスパフェ,スイーツバーサリチェ,https://www.instagram.com/salicefukui_pr/
+https://code4fukui.github.io/xrgourmet/takoyaki-takobei.glb,たこ焼き,蛸べえ,https://www.hotpepper.jp/strJ000985159/
+https://code4fukui.github.io/xrgourmet/kosen-dago.glb,高専ダゴ,高専ダゴ,http://www.kousendago.com/
+https://code4fukui.github.io/xrgourmet/echizen-seikogani.glb,越前せいごがに,,
+https://code4fukui.github.io/xrgourmet/slim-volgarice.glb,ボルガライス,SLIM the Coffee Resort,https://slim.velvet.jp/index.html/menu.html
+https://code4fukui.github.io/xrgourmet/kanematsu-sasimiteisyoku.glb,さしみ定食,おさしみ処 かねまつ,https://www.cocolocala.jp/spots/38331
+https://code4fukui.github.io/xrgourmet/mutsunohana-steak.glb,ステーキ,むつのはな,https://ricka-yukinohana.com/
+https://code4fukui.github.io/xrgourmet/icecream-makibabokujo.glb,ソフトクリーム,牧場牧場,
